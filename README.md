@@ -1,5 +1,7 @@
 # EA Impact Analyzer
 
+**Project page: [elinajo.github.io/ea-impact-analyzer](https://elinajo.github.io/ea-impact-analyzer/)**
+
 An AI-assisted enterprise architecture impact-analysis prototype. Ask it what
 breaks if you retire an application, and it answers from the architecture model
 rather than from the language model — every factual claim traces back to a
