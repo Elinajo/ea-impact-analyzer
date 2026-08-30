@@ -70,14 +70,27 @@ def load_env(path: str | Path = ENV_PATH) -> None:
         os.environ.setdefault(key, value)
 
 
+#: The value shipped in .env.example. Copying that file and forgetting to edit it
+#: is the likely first mistake, and it would otherwise reach the API and come
+#: back as an authentication error that says nothing about the real cause.
+PLACEHOLDER_KEY = "sk-ant-..."
+
+
 def api_key() -> str:
     load_env()
     key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-    if not key:
+    if not key or key == PLACEHOLDER_KEY:
+        problem = (
+            "still holds the placeholder from .env.example"
+            if key
+            else "is not set"
+        )
         raise MissingAPIKey(
-            "ANTHROPIC_API_KEY is not set. Put it in a .env file at the repository "
-            f"root ({ENV_PATH}) as ANTHROPIC_API_KEY=sk-ant-..., or export it. "
-            ".env is git-ignored and the key is never stored in source."
+            f"ANTHROPIC_API_KEY {problem}. Put a real key in {ENV_PATH} as\n"
+            "    ANTHROPIC_API_KEY=sk-ant-your-key-here\n"
+            "or export it in your shell. Get one at "
+            "https://console.anthropic.com/settings/keys\n"
+            ".env is git-ignored; the key is never stored in source or committed."
         )
     return key
 

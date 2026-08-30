@@ -26,7 +26,14 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from src.graph import load_graph  # noqa: E402
-from src.llm import MAX_TURNS, Analyst, load_env  # noqa: E402
+from src.llm import (  # noqa: E402
+    MAX_TURNS,
+    PLACEHOLDER_KEY,
+    Analyst,
+    MissingAPIKey,
+    api_key,
+    load_env,
+)
 from src.retrieval import KeywordRetriever  # noqa: E402
 
 
@@ -229,6 +236,21 @@ class EnvTests(unittest.TestCase):
 
     def test_a_missing_file_is_not_an_error(self):
         load_env(Path("/nonexistent/.env"))
+
+    def test_the_unedited_placeholder_is_rejected_as_if_unset(self):
+        """Copying .env.example and forgetting to edit it is the likely first
+        mistake. It must not reach the API and come back as an auth error."""
+        os.environ["ANTHROPIC_API_KEY"] = PLACEHOLDER_KEY
+        self.addCleanup(os.environ.pop, "ANTHROPIC_API_KEY", None)
+
+        with self.assertRaises(MissingAPIKey) as caught:
+            api_key()
+        self.assertIn("placeholder", str(caught.exception))
+
+    def test_a_real_looking_key_is_accepted(self):
+        os.environ["ANTHROPIC_API_KEY"] = "sk-ant-not-a-real-key"
+        self.addCleanup(os.environ.pop, "ANTHROPIC_API_KEY", None)
+        self.assertEqual("sk-ant-not-a-real-key", api_key())
 
 
 if __name__ == "__main__":
