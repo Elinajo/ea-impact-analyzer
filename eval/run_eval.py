@@ -208,12 +208,12 @@ def main(argv: list[str] | None = None) -> int:
     if not args.llm:
         return 0
 
-    from src.llm import Analyst, MissingAPIKey  # noqa: E402
+    from src.llm import Analyst, ConfigurationError  # noqa: E402
 
     try:
         analyst = Analyst(graph=graph, retriever=retriever)
-        analyst.client  # fail fast on a missing key, before spending a request
-    except MissingAPIKey as error:
+        analyst.client  # fail fast on configuration, before spending a request
+    except ConfigurationError as error:
         print(f"\n--llm not run: {error}", file=sys.stderr)
         return 2
 

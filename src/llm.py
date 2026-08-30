@@ -46,8 +46,24 @@ TOP_K = 3
 ENV_PATH = REPO_ROOT / ".env"
 
 
-class MissingAPIKey(RuntimeError):
+class ConfigurationError(RuntimeError):
+    """Something the environment must supply is missing or wrong.
+
+    Distinct from an API failure: nothing was sent, and no amount of retrying
+    helps until a human changes a setting.
+    """
+
+
+class MissingAPIKey(ConfigurationError):
     """Raised when no API key is available, with the way to supply one."""
+
+
+class WorkspaceRequired(ConfigurationError):
+    """Raised when the key is identity-linked and needs a workspace id.
+
+    The API rejects such a key with a 400 rather than an auth error, which
+    reads like a bug in the request. It is not: it is a missing setting.
+    """
 
 
 def load_env(path: str | Path = ENV_PATH) -> None:
@@ -93,6 +109,37 @@ def api_key() -> str:
             ".env is git-ignored; the key is never stored in source or committed."
         )
     return key
+
+
+def workspace_id() -> str | None:
+    """The workspace an identity-linked key acts in, if one is configured.
+
+    Personal API keys do not need this. Keys linked to an identity do: the API
+    rejects them with a 400 until the ``anthropic-workspace-id`` header names
+    the workspace. There is no SDK parameter for it, so it is sent as a header.
+    """
+    load_env()
+    return os.environ.get("ANTHROPIC_WORKSPACE_ID", "").strip() or None
+
+
+def _explain(error: Exception) -> Exception:
+    """Turn the workspace 400 into an error that says what to change.
+
+    Left as-is it reads as a malformed request, which sends you looking in the
+    wrong place. Any other error is passed through untouched.
+    """
+    if "anthropic-workspace-id" not in str(error):
+        return error
+    return WorkspaceRequired(
+        "This API key is identity-linked, so every request must name the workspace "
+        "it acts in.\n"
+        f"Add a line to {ENV_PATH}:\n"
+        "    ANTHROPIC_WORKSPACE_ID=wrkspc_...\n"
+        "Find the id at https://console.anthropic.com/settings/workspaces — open the "
+        "workspace and take the id from the page URL.\n"
+        "The deterministic layer needs neither key nor workspace: python3 -m src.main "
+        "--impact A05 works regardless."
+    )
 
 
 # ----------------------------------------------------------------- the prompt
@@ -484,7 +531,13 @@ class Analyst:
         if self._client is None:
             import anthropic  # imported here so the tools work without the SDK
 
-            self._client = anthropic.Anthropic(api_key=api_key())
+            workspace = workspace_id()
+            self._client = anthropic.Anthropic(
+                api_key=api_key(),
+                default_headers=(
+                    {"anthropic-workspace-id": workspace} if workspace else None
+                ),
+            )
         return self._client
 
     def _execute(self, name: str, arguments: dict[str, Any]) -> ToolCall:
@@ -507,14 +560,17 @@ class Analyst:
         definitions = [spec.definition() for spec in self.tools]
 
         for _ in range(MAX_TURNS):
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=MAX_TOKENS,
-                system=SYSTEM_PROMPT,
-                thinking={"type": "adaptive"},
-                tools=definitions,
-                messages=messages,
-            )
+            try:
+                response = self.client.messages.create(
+                    model=self.model,
+                    max_tokens=MAX_TOKENS,
+                    system=SYSTEM_PROMPT,
+                    thinking={"type": "adaptive"},
+                    tools=definitions,
+                    messages=messages,
+                )
+            except Exception as error:  # re-raised, possibly with a better message
+                raise _explain(error) from None
             answer.stop_reason = response.stop_reason or ""
             answer.input_tokens += response.usage.input_tokens
             answer.output_tokens += response.usage.output_tokens

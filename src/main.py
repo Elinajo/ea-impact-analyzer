@@ -15,7 +15,7 @@ import json
 import sys
 
 from .graph import GraphValidationError, load_graph
-from .llm import Analyst, MissingAPIKey
+from .llm import Analyst, ConfigurationError
 from .retrieval import DEFAULT_CORPUS_ROOT, KeywordRetriever
 from .tools import impact_of_retiring
 
@@ -80,13 +80,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     try:
         answer = analyst.ask(args.question)
-    except MissingAPIKey as error:
+    except ConfigurationError as error:
         print(error, file=sys.stderr)
-        print(
-            "\nThe deterministic layer needs no key: try --impact A05, or "
-            "python3 eval/run_eval.py",
-            file=sys.stderr,
-        )
         return 2
 
     if args.json:
