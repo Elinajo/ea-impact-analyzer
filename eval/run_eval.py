@@ -210,16 +210,19 @@ def main(argv: list[str] | None = None) -> int:
 
     from src.llm import Analyst, ConfigurationError  # noqa: E402
 
-    try:
-        analyst = Analyst(graph=graph, retriever=retriever)
-        analyst.client  # fail fast on configuration, before spending a request
-    except ConfigurationError as error:
-        print(f"\n--llm not run: {error}", file=sys.stderr)
-        return 2
+    analyst = Analyst(graph=graph, retriever=retriever)
 
+    # Configuration problems only surface on the first real request — a missing
+    # credit balance or workspace id is invisible at construction time. Catching
+    # them around the loop keeps them a message rather than a traceback, and the
+    # deterministic score above still stands.
     end_to_end: list[Result] = []
     for question in questions():
-        answer = analyst.ask(question["question"])
+        try:
+            answer = analyst.ask(question["question"])
+        except ConfigurationError as error:
+            print(f"\n--llm stopped at {question['id']}.\n{error}", file=sys.stderr)
+            return 2
         end_to_end.append(score_llm(question, answer))
         if args.show:
             print(f"\n### {question['id']} — {question['question']}")

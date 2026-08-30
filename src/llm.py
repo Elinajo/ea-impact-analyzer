@@ -66,6 +66,14 @@ class WorkspaceRequired(ConfigurationError):
     """
 
 
+class NoCredit(ConfigurationError):
+    """Raised when the account has no credit balance.
+
+    Also arrives as a 400, alongside genuine request errors. Separating it
+    matters because nothing about the request is wrong.
+    """
+
+
 def load_env(path: str | Path = ENV_PATH) -> None:
     """Read ``KEY=VALUE`` lines from a .env file into ``os.environ``.
 
@@ -123,12 +131,26 @@ def workspace_id() -> str | None:
 
 
 def _explain(error: Exception) -> Exception:
-    """Turn the workspace 400 into an error that says what to change.
+    """Turn the 400s that are really settings problems into readable errors.
 
-    Left as-is it reads as a malformed request, which sends you looking in the
-    wrong place. Any other error is passed through untouched.
+    Both arrive as ``invalid_request_error`` alongside genuine malformed
+    requests, which sends you looking at the request. Neither is a request
+    problem. Any other error is passed through untouched.
     """
-    if "anthropic-workspace-id" not in str(error):
+    text = str(error)
+
+    if "credit balance is too low" in text:
+        return NoCredit(
+            "The Anthropic account has no credit balance, so no request can be made.\n"
+            "Add credit at https://console.anthropic.com/settings/billing — the twelve "
+            "eval questions cost well under a dollar.\n"
+            "Nothing is wrong with the key, the workspace, or this code: the earlier "
+            "authentication errors are resolved and this is the next gate.\n"
+            "The deterministic layer is unaffected: python3 eval/run_eval.py scores "
+            "ten of the twelve questions with no API access at all."
+        )
+
+    if "anthropic-workspace-id" not in text:
         return error
     return WorkspaceRequired(
         "This API key is identity-linked, so every request must name the workspace "
