@@ -1,0 +1,1009 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EA Impact Analyzer</title>
+<meta name="description" content="An enterprise architecture impact-analysis prototype. Deterministic graph traversal for facts, retrieval for prose, and a model that refuses what the evidence cannot carry.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+/* ---------------------------------------------------------------- tokens */
+:root {
+  color-scheme: light;
+
+  --paper:      #F4F5F2;
+  --surface:    #FBFBF9;
+  --sunken:     #EAECE6;
+  --ink:        #191E1B;
+  --ink-soft:   #4A524C;
+  --ink-mute:   #757D77;
+  --rule:       #C7CDC6;
+  --rule-soft:  #DDE1DA;
+
+  --magenta:    #B3376B;
+  --magenta-bg: #F7E6ED;
+  --blue:       #2E5E86;
+  --blue-bg:    #E3EBF2;
+  --ochre:      #946716;
+  --ochre-bg:   #F5EDDC;
+  --good:       #2C6845;
+  --good-bg:    #E2EEE6;
+
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body:    "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono:    "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --measure: 68ch;
+  --page:    1080px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper:      #121614;
+    --surface:    #191E1B;
+    --sunken:     #0D100F;
+    --ink:        #E7EBE6;
+    --ink-soft:   #AEB6AF;
+    --ink-mute:   #7E877F;
+    --rule:       #333B35;
+    --rule-soft:  #262D28;
+
+    --magenta:    #E8779F;
+    --magenta-bg: #33202A;
+    --blue:       #85B4DA;
+    --blue-bg:    #1B2A36;
+    --ochre:      #D9A94F;
+    --ochre-bg:   #2E2718;
+    --good:       #74BE92;
+    --good-bg:    #17291F;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper:      #121614;
+  --surface:    #191E1B;
+  --sunken:     #0D100F;
+  --ink:        #E7EBE6;
+  --ink-soft:   #AEB6AF;
+  --ink-mute:   #7E877F;
+  --rule:       #333B35;
+  --rule-soft:  #262D28;
+
+  --magenta:    #E8779F;
+  --magenta-bg: #33202A;
+  --blue:       #85B4DA;
+  --blue-bg:    #1B2A36;
+  --ochre:      #D9A94F;
+  --ochre-bg:   #2E2718;
+  --good:       #74BE92;
+  --good-bg:    #17291F;
+}
+
+/* ------------------------------------------------------------------ base */
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 17px;
+  line-height: 1.62;
+  font-synthesis-weight: none;
+}
+
+img, svg { max-width: 100%; }
+
+a {
+  color: inherit;
+  text-decoration-color: var(--magenta);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1.5px;
+}
+a:hover { color: var(--magenta); }
+
+:focus-visible {
+  outline: 2px solid var(--magenta);
+  outline-offset: 3px;
+}
+
+.wrap {
+  max-width: var(--page);
+  margin: 0 auto;
+  padding: 0 28px;
+}
+
+.prose { max-width: var(--measure); }
+
+p { margin: 0 0 1.05em; }
+p:last-child { margin-bottom: 0; }
+
+strong { font-weight: 600; }
+
+code, .mono {
+  font-family: var(--mono);
+  font-size: 0.86em;
+  font-variant-ligatures: none;
+}
+
+p code, li code, td code {
+  background: var(--sunken);
+  border: 1px solid var(--rule-soft);
+  border-radius: 3px;
+  padding: 0.08em 0.34em;
+}
+
+/* --------------------------------------------------------------- masthead */
+.masthead {
+  border-bottom: 1px solid var(--ink);
+  padding: 22px 0 0;
+}
+
+.masthead-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 24px;
+  align-items: baseline;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.masthead-bar .set { display: flex; gap: 20px; flex-wrap: wrap; }
+
+.toggle {
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: var(--ink-mute);
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 3px 9px;
+  cursor: pointer;
+}
+.toggle:hover { color: var(--ink); border-color: var(--ink-soft); }
+
+.hero { padding: 46px 0 52px; }
+
+h1 {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(2.6rem, 7vw, 4.6rem);
+  line-height: 0.98;
+  letter-spacing: -0.028em;
+  margin: 0 0 22px;
+  text-wrap: balance;
+}
+
+.standfirst {
+  font-size: clamp(1.08rem, 2.1vw, 1.3rem);
+  line-height: 1.5;
+  color: var(--ink-soft);
+  max-width: 56ch;
+  margin: 0 0 30px;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 1px;
+  background: var(--rule);
+  border: 1px solid var(--rule);
+  max-width: 760px;
+}
+
+.fact { background: var(--paper); padding: 13px 15px; }
+
+.fact dt {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  margin: 0 0 5px;
+}
+
+.fact dd {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+/* --------------------------------------------------------------- sections */
+section { padding: 52px 0; border-top: 1px solid var(--rule); }
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--magenta);
+  margin: 0 0 14px;
+  display: block;
+}
+
+h2 {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(1.7rem, 3.6vw, 2.5rem);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  margin: 0 0 20px;
+  text-wrap: balance;
+  max-width: 22ch;
+}
+
+h3 {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 1.12rem;
+  letter-spacing: -0.008em;
+  margin: 34px 0 10px;
+}
+
+/* thesis pull */
+.thesis {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: clamp(1.35rem, 3vw, 1.95rem);
+  line-height: 1.25;
+  letter-spacing: -0.018em;
+  max-width: 26ch;
+  margin: 0 0 26px;
+  padding-left: 20px;
+  border-left: 3px solid var(--magenta);
+  text-wrap: balance;
+}
+
+/* ---------------------------------------------------------------- figures */
+figure { margin: 32px 0 0; }
+
+.plate {
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  padding: 18px;
+  overflow-x: auto;
+}
+
+.plate svg { display: block; min-width: 620px; }
+
+figcaption {
+  margin-top: 12px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  max-width: 74ch;
+}
+
+/* diagram primitives */
+.d-box { fill: var(--surface); stroke: var(--ink-soft); stroke-width: 1.2; }
+.d-box-key { fill: var(--magenta-bg); stroke: var(--magenta); stroke-width: 1.6; }
+.d-box-dim { fill: var(--sunken); stroke: var(--rule); stroke-width: 1.2; }
+.d-box-out { fill: none; stroke: var(--ink-soft); stroke-width: 1.2; stroke-dasharray: 5 4; }
+.d-label { font-family: var(--display); font-size: 13px; font-weight: 500; fill: var(--ink); }
+.d-id { font-family: var(--mono); font-size: 12px; font-weight: 600; fill: var(--ink); }
+.d-sub { font-family: var(--mono); font-size: 10.5px; fill: var(--ink-mute); }
+.d-edge { font-family: var(--mono); font-size: 10.5px; fill: var(--ink-mute); letter-spacing: 0.05em; }
+.d-lane { font-family: var(--mono); font-size: 10.5px; fill: var(--ink-mute); letter-spacing: 0.11em; }
+.d-line { stroke: var(--ink-soft); stroke-width: 1.4; fill: none; }
+.d-line-key { stroke: var(--magenta); stroke-width: 2.2; fill: none; }
+.d-line-gone { stroke: var(--ink-mute); stroke-width: 1.3; fill: none; stroke-dasharray: 4 4; opacity: 0.6; }
+.d-rule { stroke: var(--rule); stroke-width: 1; stroke-dasharray: 3 5; }
+.d-key { fill: var(--magenta); font-family: var(--mono); font-size: 10.5px; font-weight: 600; }
+
+/* ----------------------------------------------------------------- legend */
+.legend {
+  margin: 30px 0 0;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+}
+
+.legend-head {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.legend dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+}
+
+.legend dt {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--magenta);
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--rule-soft);
+  white-space: nowrap;
+}
+
+.legend dd {
+  margin: 0;
+  padding: 11px 16px 11px 0;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+.legend dt:last-of-type, .legend dd:last-of-type { border-bottom: 0; }
+
+/* ------------------------------------------------------------------ table */
+.table-scroll { overflow-x: auto; margin-top: 26px; border: 1px solid var(--rule); }
+
+table { border-collapse: collapse; width: 100%; min-width: 560px; background: var(--surface); }
+
+th, td {
+  text-align: left;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--rule-soft);
+  vertical-align: top;
+  font-size: 0.94rem;
+  line-height: 1.45;
+}
+
+thead th {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  font-weight: 500;
+  border-bottom: 1px solid var(--rule);
+  background: var(--sunken);
+}
+
+tbody tr:last-child td { border-bottom: 0; }
+
+td.q { font-family: var(--mono); font-weight: 600; font-size: 0.88rem; white-space: nowrap; }
+td.num { font-variant-numeric: tabular-nums; }
+
+/* status chips — colour is never the only signal, each carries its label */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  padding: 3px 9px 3px 7px;
+  border-radius: 2px;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.chip::before {
+  content: "";
+  width: 7px; height: 7px;
+  border-radius: 1px;
+  background: currentColor;
+  flex: none;
+}
+.chip-pass  { color: var(--good);  background: var(--good-bg);  border-color: color-mix(in srgb, var(--good) 30%, transparent); }
+.chip-open  { color: var(--ochre); background: var(--ochre-bg); border-color: color-mix(in srgb, var(--ochre) 34%, transparent); }
+.chip-miss  { color: var(--magenta); background: var(--magenta-bg); border-color: color-mix(in srgb, var(--magenta) 30%, transparent); }
+
+/* ------------------------------------------------------------------ score */
+.score {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 1px;
+  background: var(--rule);
+  border: 1px solid var(--rule);
+  margin-top: 26px;
+}
+
+.score-cell { background: var(--surface); padding: 16px 18px; }
+
+.score-cell .n {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 2.35rem;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  display: block;
+  margin-bottom: 7px;
+}
+.score-cell.is-key .n { color: var(--magenta); }
+.score-cell .k {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  display: block;
+  margin-bottom: 6px;
+}
+.score-cell .d { font-size: 0.88rem; line-height: 1.45; color: var(--ink-soft); }
+
+/* ------------------------------------------------------------------ steps */
+.steps { margin: 26px 0 0; padding: 0; list-style: none; border-top: 1px solid var(--rule); }
+
+.steps li {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  gap: 16px;
+  align-items: baseline;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+.steps .n {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-mute);
+  font-variant-numeric: tabular-nums;
+}
+
+.steps .what { font-size: 0.96rem; }
+.steps .what code { font-size: 0.84em; }
+
+/* -------------------------------------------------------------------- code */
+.cmd {
+  border: 1px solid var(--rule);
+  background: var(--sunken);
+  padding: 0;
+  margin: 18px 0 0;
+  overflow-x: auto;
+}
+
+.cmd-head {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  padding: 9px 16px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface);
+}
+
+pre {
+  margin: 0;
+  padding: 15px 16px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.72;
+  overflow-x: auto;
+}
+
+pre .p { color: var(--ink-mute); user-select: none; }
+pre .c { color: var(--ink-mute); font-style: italic; }
+pre .o { color: var(--blue); }
+
+/* ------------------------------------------------------------------- notes */
+.note {
+  border-left: 3px solid var(--ochre);
+  background: var(--ochre-bg);
+  padding: 15px 18px;
+  margin: 26px 0 0;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  max-width: 74ch;
+}
+.note b {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ochre);
+  display: block;
+  margin-bottom: 5px;
+}
+
+.two {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 30px;
+  margin-top: 26px;
+}
+
+ul.tight { margin: 0; padding-left: 1.15em; }
+ul.tight li { margin-bottom: 0.5em; }
+
+/* ------------------------------------------------------------------ footer */
+footer {
+  border-top: 1px solid var(--ink);
+  padding: 26px 0 60px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--ink-mute);
+  line-height: 1.8;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="masthead-bar">
+      <div class="set">
+        <span>EANAL Architecture Lab</span>
+        <span>Prototype · 2026</span>
+      </div>
+      <div class="set">
+        <span>Python 3.14 · stdlib</span>
+        <button class="toggle" id="theme" type="button" aria-label="Switch colour theme">Theme</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap hero">
+    <h1>EA Impact Analyzer</h1>
+    <p class="standfirst">Ask what breaks if you retire an application. Every answer traces
+      back to a relationship that is really in the model — or says plainly that the
+      repository cannot answer it.</p>
+
+    <dl class="facts">
+      <div class="fact"><dt>Model</dt><dd>22 elements<br>33 relationships</dd></div>
+      <div class="fact"><dt>Tests</dt><dd>50 passing<br>0 skipped</dd></div>
+      <div class="fact"><dt>Eval</dt><dd>10 of 12 measured<br>2 unmeasured</dd></div>
+      <div class="fact"><dt>Dependencies</dt><dd>None in the<br>deterministic layer</dd></div>
+    </dl>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================= thesis -->
+<section>
+  <div class="wrap">
+    <span class="eyebrow">The decision that matters</span>
+    <h2>The model does not produce architecture facts</h2>
+
+    <p class="thesis">Structured relationships are queried. Prose is retrieved. The
+      LLM does neither.</p>
+
+    <div class="prose">
+      <p>An architecture repository holds structured relationships. Asking which
+        applications support a capability is a <strong>query</strong>, not a similarity
+        search. The answer is computable, and therefore checkable.</p>
+
+      <p>Embedding that structure as prose and retrieving it throws the structure
+        away, and replaces a correct answer with a plausible one for nothing in
+        return. So retrieval is reserved for the part of the corpus that genuinely
+        <em>is</em> prose — principles and decision records, where the question really
+        is “what did we say about this” and there is no relation to traverse.</p>
+    </div>
+
+    <figure>
+      <div class="plate">
+        <svg viewBox="0 0 900 296" role="img"
+             aria-label="A two-lane diagram. In the upper lane, Claude interprets the question and chooses a tool, and later explains the result and cites the path. In the lower lane, deterministic Python traverses the architecture model. A tool call crosses down into the code lane, and findings carrying relationship paths cross back up. No fact enters the upper lane except from the code lane.">
+          <defs>
+            <marker id="flow-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7"
+                    markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--ink-soft)"/>
+            </marker>
+            <marker id="flow-key" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7"
+                    markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--magenta)"/>
+            </marker>
+          </defs>
+
+          <text class="d-lane" x="16" y="26">CLAUDE — INTERPRETS AND EXPLAINS</text>
+
+          <!-- upper lane -->
+          <rect class="d-box-dim" x="16"  y="70" width="100" height="52" rx="2"/>
+          <text class="d-label" x="66"  y="101" text-anchor="middle">Question</text>
+
+          <rect class="d-box" x="140" y="70" width="250" height="52" rx="2"/>
+          <text class="d-label" x="265" y="93"  text-anchor="middle">Interpret the question,</text>
+          <text class="d-label" x="265" y="110" text-anchor="middle">choose a tool</text>
+
+          <rect class="d-box" x="520" y="70" width="250" height="52" rx="2"/>
+          <text class="d-label" x="645" y="93"  text-anchor="middle">Explain the result,</text>
+          <text class="d-label" x="645" y="110" text-anchor="middle">cite the path</text>
+
+          <rect class="d-box-dim" x="794" y="70" width="90" height="52" rx="2"/>
+          <text class="d-label" x="839" y="101" text-anchor="middle">Answer</text>
+
+          <!-- the boundary -->
+          <line class="d-rule" x1="16" y1="162" x2="884" y2="162"/>
+          <text class="d-lane" x="16" y="186">DETERMINISTIC PYTHON — EVERY FACT ORIGINATES HERE</text>
+
+          <!-- lower lane -->
+          <rect class="d-box-key" x="140" y="214" width="250" height="64" rx="2"/>
+          <text class="d-id"    x="265" y="238" text-anchor="middle">src/tools.py</text>
+          <text class="d-sub"   x="265" y="256" text-anchor="middle">traversal over ea_model.json</text>
+
+          <!-- flow -->
+          <line class="d-line" x1="116" y1="96"  x2="134" y2="96"  marker-end="url(#flow-ink)"/>
+          <line class="d-line" x1="265" y1="122" x2="265" y2="208" marker-end="url(#flow-ink)"/>
+          <line class="d-line" x1="770" y1="96"  x2="788" y2="96"  marker-end="url(#flow-ink)"/>
+          <text class="d-edge" x="277" y="152">tool call</text>
+
+          <path class="d-line-key" d="M390 246 H645 V128" marker-end="url(#flow-key)"/>
+          <text class="d-key" x="517" y="238" text-anchor="middle">findings + relationship path</text>
+        </svg>
+      </div>
+      <figcaption>The model chooses which question to ask, and how to phrase the answer.
+        It never supplies the answer: nothing crosses back into the upper lane except a
+        finding that already carries the edges which produced it.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ======================================================== the semantics -->
+<section>
+  <div class="wrap">
+    <span class="eyebrow">The substance</span>
+    <h2>Owning data and reading data are not the same thing</h2>
+
+    <div class="prose">
+      <p><strong>OWNS</strong> means the application is the authoritative source for a
+        data object. Retire it and that data is orphaned — nothing is authoritative for
+        it any more.</p>
+      <p><strong>CONSUMES</strong> means the application reads data it is <em>not</em>
+        authoritative for. Retire it and the data object is untouched; only the consumer
+        loses access.</p>
+      <p>A system that reports “retiring A05 affects D01, D02, D03, D05” is wrong. A05
+        consumes the first three and owns only the last. One generic <span class="mono">USES</span>
+        edge would collapse the two cases together and report four impacted data objects
+        where there is one.</p>
+    </div>
+
+    <figure>
+      <div class="plate">
+        <svg viewBox="0 0 900 300" role="img"
+             aria-label="Diagram of retiring application A05. A02, A03 and A04 each own D01, D02 and D03 respectively. A05 consumes D01, D02 and D03, and owns D05. When A05 is retired its edges disappear: D01 to D03 still have their owners and survive, while D05 has no remaining owner and is orphaned.">
+          <defs>
+            <marker id="owns-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7"
+                    markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--ink-soft)"/>
+            </marker>
+          </defs>
+
+          <!-- owners -->
+          <rect class="d-box" x="16" y="26" width="104" height="40" rx="2"/>
+          <text class="d-id" x="68" y="51" text-anchor="middle">A02</text>
+          <rect class="d-box" x="16" y="106" width="104" height="40" rx="2"/>
+          <text class="d-id" x="68" y="131" text-anchor="middle">A03</text>
+          <rect class="d-box" x="16" y="186" width="104" height="40" rx="2"/>
+          <text class="d-id" x="68" y="211" text-anchor="middle">A04</text>
+
+          <!-- data objects -->
+          <rect class="d-box" x="250" y="26" width="104" height="40" rx="2"/>
+          <text class="d-id" x="302" y="51" text-anchor="middle">D01</text>
+          <rect class="d-box" x="250" y="106" width="104" height="40" rx="2"/>
+          <text class="d-id" x="302" y="131" text-anchor="middle">D02</text>
+          <rect class="d-box" x="250" y="186" width="104" height="40" rx="2"/>
+          <text class="d-id" x="302" y="211" text-anchor="middle">D03</text>
+
+          <!-- surviving OWNS edges -->
+          <line class="d-line" x1="120" y1="46"  x2="244" y2="46"  marker-end="url(#owns-ink)"/>
+          <line class="d-line" x1="120" y1="126" x2="244" y2="126" marker-end="url(#owns-ink)"/>
+          <line class="d-line" x1="120" y1="206" x2="244" y2="206" marker-end="url(#owns-ink)"/>
+          <text class="d-edge" x="182" y="38"  text-anchor="middle">OWNS</text>
+          <text class="d-edge" x="182" y="118" text-anchor="middle">OWNS</text>
+          <text class="d-edge" x="182" y="198" text-anchor="middle">OWNS</text>
+
+          <!-- A05, retired -->
+          <rect class="d-box-out" x="500" y="94" width="150" height="64" rx="2"/>
+          <text class="d-id"  x="575" y="120" text-anchor="middle">A05</text>
+          <text class="d-sub" x="575" y="139" text-anchor="middle">retired</text>
+
+          <!-- dead CONSUMES edges -->
+          <g>
+            <path class="d-line-gone" d="M500 112 L360 50"/>
+            <path class="d-line-gone" d="M500 126 L360 126"/>
+            <path class="d-line-gone" d="M500 140 L360 202"/>
+          </g>
+          <text class="d-edge" x="430" y="118" text-anchor="middle">CONSUMES ×3</text>
+
+          <!-- dead OWNS edge to D05 -->
+          <path class="d-line-gone" d="M650 126 L734 126"/>
+          <text class="d-edge" x="692" y="118" text-anchor="middle">OWNS</text>
+
+          <rect class="d-box-key" x="740" y="106" width="104" height="40" rx="2"/>
+          <text class="d-id" x="792" y="131" text-anchor="middle">D05</text>
+
+          <text class="d-key" x="792" y="166" text-anchor="middle">NO OWNER LEFT</text>
+          <text class="d-sub" x="302" y="252" text-anchor="middle">still owned — unaffected</text>
+        </svg>
+      </div>
+      <figcaption>Dashed edges are the ones that disappear when A05 is retired. D01 to D03
+        each keep a solid <span class="mono">OWNS</span> edge from another application, so
+        they survive; D05 has none left, so it is orphaned. The rule is not “what did A05
+        touch” but “what has no authoritative source afterwards”.</figcaption>
+    </figure>
+
+    <div class="legend">
+      <div class="legend-head">Relationship types — the whole vocabulary</div>
+      <dl>
+        <dt>SUPPORTS</dt><dd>application → capability. The application realises part of the capability.</dd>
+        <dt>OWNS</dt><dd>application → data object. Authoritative source. Retiring it orphans the data.</dd>
+        <dt>CONSUMES</dt><dd>application → data object. Reads it without authority. Retiring it changes nothing for the data.</dd>
+        <dt>DEPENDS_ON</dt><dd>application → application. Retiring the target breaks the source.</dd>
+        <dt>RUNS_ON</dt><dd>application → technology. Orphaned only if this was the last application on it.</dd>
+      </dl>
+    </div>
+
+    <div class="two">
+      <div>
+        <h3>Technology is orphaned only if it was the last</h3>
+        <p>A05 runs on <span class="mono">T02</span> and <span class="mono">T03</span>, but
+          A06 also runs on T02 — so only T03 is orphaned. A06 depends on A05, but A06 has
+          not been retired, so it is still running.</p>
+      </div>
+      <div>
+        <h3>Losing all support is stronger than being degraded</h3>
+        <p><span class="mono">C04</span> is supported only by A05 and loses all support.
+          <span class="mono">C03</span> is supported by applications that merely depend on
+          A05 — a weaker and separate claim, reported in its own list.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= refusal -->
+<section>
+  <div class="wrap">
+    <span class="eyebrow">Epistemic boundary</span>
+    <h2>What it refuses to answer</h2>
+
+    <div class="prose">
+      <p>Asked <em>“can we safely retire the Operational Data Platform?”</em>, the system
+        declines. It can enumerate architectural dependencies. It cannot determine
+        operational safety, which needs service level requirements, a transition plan,
+        migration arrangements for the data A05 owns, and an operational risk assessment.
+        None of that is in the repository. Cost is not represented anywhere at all.</p>
+
+      <p>The refusal is <strong>not a keyword rule</strong>. The system prompt states what
+        the repository contains and what it does not, and the refusal follows from that
+        boundary — so it applies to any question the evidence cannot carry, not only to
+        the two in the eval set. A keyword rule would score green on those two and prove
+        nothing.</p>
+
+      <p>A confident yes or no scores zero, and it should. A system that expresses more
+        confidence than its evidence supports produces over-reliance no matter how
+        accurate it is elsewhere.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ eval -->
+<section>
+  <div class="wrap">
+    <span class="eyebrow">Evaluation</span>
+    <h2>Twelve questions, written before the system existed</h2>
+
+    <div class="prose">
+      <p>Expected answers are never adjusted to match what the system produces. The runner
+        scores in two layers, because they measure different things and one combined
+        number would hide which layer failed.</p>
+    </div>
+
+    <div class="score">
+      <div class="score-cell is-key">
+        <span class="k">Honest score</span>
+        <span class="n">10 / 12</span>
+        <span class="d">Measured and passing. The other two are <em>unmeasured</em>, not passing.</span>
+      </div>
+      <div class="score-cell">
+        <span class="k">Graph questions</span>
+        <span class="n">8 / 8</span>
+        <span class="d">Exact set match against the deterministic tools. Computed, not generated.</span>
+      </div>
+      <div class="score-cell">
+        <span class="k">Retrieval probes</span>
+        <span class="n">5 / 7</span>
+        <span class="d">Paraphrases outside the eval set. Two miss the right document entirely.</span>
+      </div>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Q</th><th>Type</th><th>Result</th><th>Note</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="q">Q01–Q08</td><td>Graph</td><td><span class="chip chip-pass">Pass</span></td>
+              <td>Exact set match. These are computed answers and must keep matching exactly.</td></tr>
+          <tr><td class="q">Q09</td><td>Retrieval</td><td><span class="chip chip-pass">Pass</span></td>
+              <td>P03 retrieved at rank 1 — but see the caveat below.</td></tr>
+          <tr><td class="q">Q10</td><td>Retrieval</td><td><span class="chip chip-pass">Pass</span></td>
+              <td>ADR-002 retrieved at rank 1 — same caveat.</td></tr>
+          <tr><td class="q">Q11</td><td>Refusal</td><td><span class="chip chip-open">Not run</span></td>
+              <td>“Can we safely retire A05?” The layer is built and unit-tested against a stubbed client, but has never called the real API.</td></tr>
+          <tr><td class="q">Q12</td><td>Refusal</td><td><span class="chip chip-open">Not run</span></td>
+              <td>“What would a replacement cost?” Same status.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <b>The retrieval passes for a flattering reason</b>
+      Q09 and Q10 both share vocabulary with the document they are supposed to find: Q09
+      says “AI-assisted service” and P03 says “AI-assisted service”; Q10 says “shared data
+      platform”, which is ADR-002’s title. That is a real pass, but it is not evidence that
+      the retrieval generalises.
+    </div>
+
+    <h3>Where the keyword retrieval actually falls over</h3>
+    <div class="prose">
+      <p><code>eval/retrieval_probe.py</code> asks the same questions in words the documents
+        do not use. Five of seven find the right document. The two misses are total:</p>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Probe</th><th>Expected</th><th>Result</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>“What rule governs who is the <em>master system</em> for a <em>dataset</em>?”</td>
+              <td class="q">P01</td><td><span class="chip chip-miss">Not in top 3</span></td></tr>
+          <tr><td>“How should systems <em>talk to each other</em>?”</td>
+              <td class="q">P02</td><td><span class="chip chip-miss">Not in top 3</span></td></tr>
+          <tr><td>“Do we need a person to sign off on automated advice?”</td>
+              <td class="q">P03</td><td><span class="chip chip-pass">Rank 1</span></td></tr>
+          <tr><td>“Why is everything coupled to the operational data platform?”</td>
+              <td class="q">ADR-002</td><td><span class="chip chip-pass">Rank 1</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="prose">
+      <p style="margin-top:22px">These are <strong>vocabulary mismatches, not ranking
+        errors</strong>. BM25 cannot connect “master system” to “authoritative source”, and
+        no amount of tuning fixes that. It is precisely the case a vector index exists for.
+        The hybrid retrieval is deliberately half-built — keyword first, so that what a
+        vector index adds can be <em>measured</em> rather than assumed — and this probe is
+        the measurement saying it would now be worth adding.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================= run -->
+<section>
+  <div class="wrap">
+    <span class="eyebrow">Running it</span>
+    <h2>Everything except the model layer runs with no dependencies</h2>
+
+    <div class="cmd">
+      <div class="cmd-head">Tests — standard library, no virtualenv needed</div>
+<pre><span class="p">$</span> python3 -m unittest discover -s tests -t . -v
+<span class="o">50 passed · 52 subtests · 0 skipped</span></pre>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-head">The score table and the retrieval diagnostic</div>
+<pre><span class="p">$</span> python3 eval/run_eval.py          <span class="c"># twelve questions, scored</span>
+<span class="p">$</span> python3 eval/retrieval_probe.py   <span class="c"># where retrieval breaks down</span></pre>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-head">Ask it something — no API key required for this one</div>
+<pre><span class="p">$</span> python3 -m src.main --impact A05
+
+Impact of retiring A05 (Operational Data Platform)
+
+Dependent applications:
+  - A07 (Decision Support Dashboard): depends on A05, direct and indirect
+      · direct:   A07 -DEPENDS_ON-&gt; A05
+      · indirect: A07 -DEPENDS_ON-&gt; A01 ; A01 -DEPENDS_ON-&gt; A05
+
+Orphaned data objects:
+  - D05 (Operational Events): A05 is its only authoritative source [A05 -OWNS-&gt; D05]</pre>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-head">The model layer — needs a key</div>
+<pre><span class="p">$</span> python3 -m venv .venv &amp;&amp; .venv/bin/pip install pytest anthropic
+<span class="p">$</span> cp .env.example .env      <span class="c"># put your key in it; .env is git-ignored</span>
+<span class="p">$</span> .venv/bin/python3 -m src.main "Which applications depend on the platform?"
+<span class="p">$</span> .venv/bin/python3 eval/run_eval.py --llm --show</pre>
+    </div>
+
+    <div class="note">
+      <b>What to check first</b>
+      Run <code>eval/run_eval.py --llm --show</code> and read the answers to Q11 and Q12
+      yourself. The scoring at that layer is a heuristic over English sentences and says so
+      in its own output — it is a screen, not a verdict.
+    </div>
+  </div>
+</section>
+
+<!-- =============================================================== build -->
+<section>
+  <div class="wrap">
+    <span class="eyebrow">Build order</span>
+    <h2>Eight steps, deliberately in this order</h2>
+
+    <div class="prose">
+      <p>Each stage stands on its own. If time had run out at step four, what existed would
+        still have been a defensible project — which is why the model layer came last, not
+        first.</p>
+    </div>
+
+    <ol class="steps">
+      <li><span class="n">01</span><span class="what">Graph and loader — <code>src/graph.py</code></span><span class="chip chip-pass">Done</span></li>
+      <li><span class="n">02</span><span class="what">Eval set — <code>eval/questions.json</code>, written before the code</span><span class="chip chip-pass">Done</span></li>
+      <li><span class="n">03</span><span class="what">Deterministic tools — <code>src/tools.py</code></span><span class="chip chip-pass">Done</span></li>
+      <li><span class="n">04</span><span class="what">Tests for Q01–Q08 — <code>tests/</code></span><span class="chip chip-pass">Done</span></li>
+      <li><span class="n">05</span><span class="what">Retrieval — <code>src/retrieval.py</code>, keyword half only</span><span class="chip chip-open">Half</span></li>
+      <li><span class="n">06</span><span class="what">Model layer — <code>src/llm.py</code>, never run against the API</span><span class="chip chip-open">Untried</span></li>
+      <li><span class="n">07</span><span class="what">CLI — <code>src/main.py</code></span><span class="chip chip-pass">Done</span></li>
+      <li><span class="n">08</span><span class="what">README and eval runner</span><span class="chip chip-pass">Done</span></li>
+    </ol>
+
+    <div class="two">
+      <div>
+        <h3>Written down as it went</h3>
+        <p><code>DECISIONS.md</code> holds one entry per architecture decision, written at
+          the time rather than reconstructed at the end — including the ones where a
+          proposal was changed, and why. Fifteen entries; nine still marked as proposals
+          awaiting sign-off.</p>
+      </div>
+      <div>
+        <h3>Deliberately not built</h3>
+        <p>No web framework, no database, no ORM, and no vector index yet. The model is 22
+          elements: traversal over dictionaries is faster than a query planner would be, and
+          the file stays readable and diffable in git.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    EA Impact Analyzer · prototype built for the EUROCONTROL AI-Native EA Tooling
+    traineeship interview, 2 September 2026.<br>
+    The architecture model describes a fictional organisation. No real architecture is
+    represented.
+  </div>
+</footer>
+
+<script>
+(function () {
+  var root = document.documentElement;
+  var btn = document.getElementById("theme");
+  try {
+    var saved = localStorage.getItem("ea-theme");
+    if (saved === "dark" || saved === "light") root.setAttribute("data-theme", saved);
+  } catch (e) { /* private mode, storage blocked — the media query still works */ }
+
+  btn.addEventListener("click", function () {
+    var dark = root.getAttribute("data-theme") === "dark" ||
+      (!root.hasAttribute("data-theme") &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches);
+    var next = dark ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    try { localStorage.setItem("ea-theme", next); } catch (e) {}
+  });
+})();
+</script>
+
+</body>
+</html>

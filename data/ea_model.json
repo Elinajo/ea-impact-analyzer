@@ -1,0 +1,86 @@
+{
+  "_about": "Synthetic enterprise architecture model for a fictional organisation, the European Air Navigation Architecture Lab (EANAL). All elements are invented. No real organisation's architecture is represented.",
+  "_relationship_semantics": {
+    "SUPPORTS": "application -> capability. The application realises part of the capability.",
+    "OWNS": "application -> data_object. The application is the authoritative source for that data. Retiring it orphans the data object.",
+    "CONSUMES": "application -> data_object. The application reads the data but is not authoritative for it. Retiring the consumer does NOT affect the data object.",
+    "DEPENDS_ON": "application -> application. The source application requires a service or interface provided by the target. Retiring the target breaks the source.",
+    "RUNS_ON": "application -> technology. Retiring the last application on a technology leaves that technology orphaned."
+  },
+
+  "capabilities": [
+    { "id": "C01", "name": "Network Capacity Management" },
+    { "id": "C02", "name": "Flight Information Management" },
+    { "id": "C03", "name": "Operational Decision Support" },
+    { "id": "C04", "name": "Operational Data Management" },
+    { "id": "C05", "name": "Safety Occurrence Management" }
+  ],
+
+  "applications": [
+    { "id": "A01", "name": "Network Management Platform", "lifecycle": "strategic" },
+    { "id": "A02", "name": "Flight Data Processing System", "lifecycle": "tolerated" },
+    { "id": "A03", "name": "Weather Information System", "lifecycle": "strategic" },
+    { "id": "A04", "name": "Surveillance Platform", "lifecycle": "strategic" },
+    { "id": "A05", "name": "Operational Data Platform", "lifecycle": "strategic" },
+    { "id": "A06", "name": "Safety Reporting Tool", "lifecycle": "tolerated" },
+    { "id": "A07", "name": "Decision Support Dashboard", "lifecycle": "strategic" }
+  ],
+
+  "data_objects": [
+    { "id": "D01", "name": "Flight Data" },
+    { "id": "D02", "name": "Weather Data" },
+    { "id": "D03", "name": "Surveillance Data" },
+    { "id": "D04", "name": "Capacity Measures" },
+    { "id": "D05", "name": "Operational Events" },
+    { "id": "D06", "name": "Safety Reports" }
+  ],
+
+  "technologies": [
+    { "id": "T01", "name": "Cloud Compute Platform" },
+    { "id": "T02", "name": "API Gateway" },
+    { "id": "T03", "name": "Data Lake" },
+    { "id": "T04", "name": "Identity Platform" }
+  ],
+
+  "relationships": [
+    { "from": "A01", "type": "SUPPORTS", "to": "C01" },
+    { "from": "A01", "type": "SUPPORTS", "to": "C03" },
+    { "from": "A01", "type": "OWNS", "to": "D04" },
+    { "from": "A01", "type": "CONSUMES", "to": "D01" },
+    { "from": "A01", "type": "CONSUMES", "to": "D02" },
+    { "from": "A01", "type": "DEPENDS_ON", "to": "A05" },
+    { "from": "A01", "type": "RUNS_ON", "to": "T01" },
+
+    { "from": "A02", "type": "SUPPORTS", "to": "C02" },
+    { "from": "A02", "type": "OWNS", "to": "D01" },
+    { "from": "A02", "type": "RUNS_ON", "to": "T01" },
+
+    { "from": "A03", "type": "SUPPORTS", "to": "C02" },
+    { "from": "A03", "type": "OWNS", "to": "D02" },
+    { "from": "A03", "type": "RUNS_ON", "to": "T01" },
+
+    { "from": "A04", "type": "SUPPORTS", "to": "C01" },
+    { "from": "A04", "type": "OWNS", "to": "D03" },
+    { "from": "A04", "type": "RUNS_ON", "to": "T01" },
+
+    { "from": "A05", "type": "SUPPORTS", "to": "C04" },
+    { "from": "A05", "type": "OWNS", "to": "D05" },
+    { "from": "A05", "type": "CONSUMES", "to": "D01" },
+    { "from": "A05", "type": "CONSUMES", "to": "D02" },
+    { "from": "A05", "type": "CONSUMES", "to": "D03" },
+    { "from": "A05", "type": "RUNS_ON", "to": "T03" },
+    { "from": "A05", "type": "RUNS_ON", "to": "T02" },
+
+    { "from": "A06", "type": "SUPPORTS", "to": "C05" },
+    { "from": "A06", "type": "OWNS", "to": "D06" },
+    { "from": "A06", "type": "DEPENDS_ON", "to": "A05" },
+    { "from": "A06", "type": "RUNS_ON", "to": "T02" },
+
+    { "from": "A07", "type": "SUPPORTS", "to": "C03" },
+    { "from": "A07", "type": "CONSUMES", "to": "D04" },
+    { "from": "A07", "type": "CONSUMES", "to": "D05" },
+    { "from": "A07", "type": "DEPENDS_ON", "to": "A01" },
+    { "from": "A07", "type": "DEPENDS_ON", "to": "A05" },
+    { "from": "A07", "type": "RUNS_ON", "to": "T01" }
+  ]
+}

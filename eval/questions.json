@@ -1,0 +1,95 @@
+{
+  "_about": "Evaluation set written BEFORE the retrieval and LLM layers were implemented. Expected answers derived by hand from data/ea_model.json and the principle/ADR documents. Two cases (Q11, Q12) are designed to be unanswerable from the model; the correct behaviour is refusal with a statement of what is missing, not a best guess.",
+  "_scoring": {
+    "graph_questions": "exact set match on expected_answer ids",
+    "retrieval_questions": "expected_sources present in top-k retrieved chunks",
+    "refusal_questions": "system must decline and name the missing information; any confident verdict scores 0"
+  },
+
+  "questions": [
+    {
+      "id": "Q01",
+      "type": "graph",
+      "question": "Which applications support Network Capacity Management?",
+      "expected_answer": ["A01", "A04"],
+      "note": "Direct SUPPORTS lookup."
+    },
+    {
+      "id": "Q02",
+      "type": "graph",
+      "question": "Which applications depend directly on the Operational Data Platform?",
+      "expected_answer": ["A01", "A06", "A07"],
+      "note": "Direct DEPENDS_ON inbound edges to A05."
+    },
+    {
+      "id": "Q03",
+      "type": "graph",
+      "question": "Which data objects would lose their authoritative source if the Operational Data Platform were retired?",
+      "expected_answer": ["D05"],
+      "note": "Tests the OWNS vs CONSUMES distinction. A05 consumes D01, D02, D03 but owns only D05. A wrong system will return all four."
+    },
+    {
+      "id": "Q04",
+      "type": "graph",
+      "question": "Which capabilities would lose all application support if the Operational Data Platform were retired?",
+      "expected_answer": ["C04"],
+      "note": "C04 is supported only by A05. C03 is degraded (both A01 and A07 depend on A05) but is a second-order effect, not a loss of direct support."
+    },
+    {
+      "id": "Q05",
+      "type": "graph",
+      "question": "Which applications are indirectly affected by retiring the Operational Data Platform?",
+      "expected_answer": ["A07"],
+      "note": "A07 depends on A01, which depends on A05. Tests transitive traversal without double-counting A07's own direct dependency."
+    },
+    {
+      "id": "Q06",
+      "type": "graph",
+      "question": "Which technologies would be left with no applications running on them if the Operational Data Platform were retired?",
+      "expected_answer": ["T03"],
+      "note": "A05 runs on T03 and T02, but A06 also runs on T02, so only T03 is orphaned."
+    },
+    {
+      "id": "Q07",
+      "type": "graph",
+      "question": "Which applications consume Flight Data without owning it?",
+      "expected_answer": ["A01", "A05"],
+      "note": "A02 owns D01 and must be excluded."
+    },
+    {
+      "id": "Q08",
+      "type": "graph",
+      "question": "Which capabilities are unaffected by retiring the Operational Data Platform?",
+      "expected_answer": ["C02"],
+      "note": "Negative control. C02 is supported by A02 and A03, neither of which depends on A05."
+    },
+    {
+      "id": "Q09",
+      "type": "retrieval",
+      "question": "Which architecture principle applies to introducing a new AI-assisted service?",
+      "expected_sources": ["principles/P03-human-accountability.md"],
+      "note": "Retrieval over prose. Expect this to be the weakest case — architecture documents share vocabulary heavily."
+    },
+    {
+      "id": "Q10",
+      "type": "retrieval",
+      "question": "Has any prior decision been recorded about replacing a shared data platform?",
+      "expected_sources": ["adrs/ADR-002-shared-data-platform.md"],
+      "note": "Tests whether retrieval finds the relevant ADR rather than a principle with similar wording."
+    },
+    {
+      "id": "Q11",
+      "type": "refusal",
+      "question": "Can we safely retire the Operational Data Platform?",
+      "expected_behaviour": "Decline to give a verdict. State that the model can enumerate architectural dependencies but cannot determine operational safety without service level requirements, transition plans, data migration arrangements for D05, and an operational risk assessment.",
+      "note": "The system knows dependencies, not safety. A confident yes or no scores zero."
+    },
+    {
+      "id": "Q12",
+      "type": "refusal",
+      "question": "How much would it cost to replace the Flight Data Processing System?",
+      "expected_behaviour": "Decline. Cost is not represented anywhere in the model; the system should say so rather than estimating.",
+      "note": "Tests whether the LLM invents information absent from the evidence."
+    }
+  ]
+}
